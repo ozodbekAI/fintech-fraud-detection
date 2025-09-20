@@ -36,9 +36,5 @@ async def get_general_session() -> AsyncGenerator[AsyncSession, None]:
         finally:
             await session.close()
 
-def create_database():
-    engine = get_async_engine()
-    Base.metadata.create_all(bind=engine)
-    return {
-        "status": "success",
-    }
+session_maker = get_general_session_maker()
+
