@@ -1,6 +1,6 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from app.services.transactions import broker
+from worker.producer import broker
 from app.api.users import app as users_router
 from app.api.transactions import app as transactions_router
 

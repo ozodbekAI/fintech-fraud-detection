@@ -11,7 +11,7 @@ class TransactionCreate(BaseModel):
 
 
 class TransactionResponse(BaseModel):
-    id: int
+    id: str
     sender_id: int
     receiver_id: int
     amount: float
