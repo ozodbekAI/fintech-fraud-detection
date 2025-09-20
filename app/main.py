@@ -1,12 +1,15 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from app.services.transactions import broker
 from app.api.users import app as users_router
-from app.core.database import create_database
+from app.api.transactions import app as transactions_router
+
 
 app = FastAPI()
 
 
 app.include_router(users_router)
+app.include_router(transactions_router)
 
 app.add_middleware(
     CORSMiddleware,
@@ -19,8 +22,12 @@ app.add_middleware(
 async def root():
     return {"message": "Welcome to the Fintech Fraud Detection API"}
 
+@app.on_event("startup")
+async def startup_event():
+    await broker.connect()
 
-@app.post("/create-database/")
-async def create_database():
-    await create_database()
-    return {"message": "Database created successfully"}
+@app.on_event("shutdown")
+async def shutdown_event():
+    await broker.close()
+
+

@@ -19,7 +19,7 @@ async def create_transaction(transaction: TransactionCreate, session: AsyncSessi
     await session.commit()
     await session.refresh(transaction_record)
 
-
+    
     await broker.publish(
         {
             "id": transaction_record.id,
