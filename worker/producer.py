@@ -5,7 +5,7 @@ from app.schemas.transactions import TransactionCreate, TransactionResponse
 import uuid
 import datetime
 
-broker = RabbitBroker()
+broker = RabbitBroker(url="amqp://admin:admin@rabbitmq:5672/")
 
 
 async def create_transaction(data, queue):

@@ -1,0 +1,133 @@
+services:
+  # RabbitMQ Message Broker
+  rabbitmq:
+    image: rabbitmq:3.12-management
+    container_name: rabbitmq
+    ports:
+      - "5672:5672"      # AMQP port
+      - "15672:15672"    # Management UI port
+      - "15692:15692"    # Prometheus metrics port
+    environment:
+      RABBITMQ_DEFAULT_USER: admin
+      RABBITMQ_DEFAULT_PASS: admin
+      RABBITMQ_DEFAULT_VHOST: /
+    volumes:
+      - rabbitmqdata:/var/lib/rabbitmq
+      - ./rabbitmq_enabled_plugins:/etc/rabbitmq_enabled_plugins
+    healthcheck:
+      test: rabbitmq-diagnostics -q ping
+      interval: 30s
+      timeout: 30s
+      retries: 3
+    networks:
+      - app-network
+
+  # Your Backend Application
+  backend:
+    build: .
+    container_name: backend
+    ports:
+      - "8080:8080"
+    environment:
+      - RABBITMQ_URL=amqp://admin:admin@rabbitmq:5672/
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+    logging:
+      driver: json-file
+      options:
+        tag: "{{.ImageName}}|{{.Name}}|{{.ImageFullID}}|{{.FullID}}"
+    networks:
+      - app-network
+
+  # Worker (FastStream app)
+  worker:
+    build: .  # Same build context as backend
+    container_name: worker
+    command: python -m faststream run worker.producer:app
+    environment:
+      - RABBITMQ_URL=amqp://admin:admin@rabbitmq:5672/
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+    logging:
+      driver: json-file
+      options:
+        tag: "{{.ImageName}}|{{.Name}}|{{.ImageFullID}}|{{.FullID}}"
+    networks:
+      - app-network
+
+  # Loki (Log aggregation)
+  loki:
+    image: grafana/loki:2.9.2
+    container_name: loki
+    ports:
+      - "3100:3100"
+    volumes:
+      - ./loki-config.yaml:/etc/local-config.yaml
+      - lokidata:/loki
+    networks:
+      - monitoring
+
+  # Promtail (Log collector)
+  promtail:
+    image: grafana/promtail:2.9.2
+    container_name: promtail
+    ports:
+      - "9080:9080"
+    volumes:
+      - /var/lib/docker/containers:/var/lib/docker/containers:ro
+      - /var/run/docker.sock:/var/run/docker.sock
+      - ./promtail-config.yaml:/etc/promtail-config.yml
+    command: -config.file=/etc/promtail-config.yml
+    privileged: true
+    networks:
+      - monitoring
+
+  # Prometheus (Metrics collection)
+  prometheus:
+    image: prom/prometheus:v2.47.2
+    container_name: prometheus
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./prometheus.yml:/etc/prometheus/prometheus.yml
+      - prometheusdata:/prometheus
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--web.console.libraries=/etc/prometheus/console_libraries'
+      - '--web.console.templates=/etc/prometheus/consoles'
+      - '--storage.tsdb.retention.time=200h'
+      - '--web.enable-lifecycle'
+    networks:
+      - monitoring
+      - app-network
+
+  # Grafana (Visualization)
+  grafana:
+    image: grafana/grafana:10.2.0
+    container_name: grafana
+    ports:
+      - "3000:3000"
+    environment:
+      - GF_SECURITY_ADMIN_USER=admin
+      - GF_SECURITY_ADMIN_PASSWORD=admin
+      - GF_USERS_ALLOW_SIGN_UP=false
+    volumes:
+      - ./grafana/datasources.yaml:/etc/grafana/datasources.yaml
+      - grafanadata:/var/lib/grafana
+    networks:
+      - monitoring
+
+volumes:
+  grafanadata:
+  prometheusdata:
+  rabbitmqdata:
+  lokidata:
+
+networks:
+  app-network:
+    driver: bridge
+  monitoring:
+    driver: bridge
