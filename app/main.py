@@ -25,9 +25,9 @@ async def root():
 @app.on_event("startup")
 async def startup_event():
     await broker.connect()
+    print("Broker connected")
 
 @app.on_event("shutdown")
 async def shutdown_event():
     await broker.close()
-
-
+    print("Broker disconnected")

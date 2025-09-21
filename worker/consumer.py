@@ -2,14 +2,15 @@ from faststream import FastStream
 from faststream.rabbit import RabbitBroker
 from app.models.transactions import Transaction, TransactionStatus
 from worker.fraud_checker import fraud_check
-from app.core.database import session_marker
+from app.core.database import session_maker
+from worker.producer import broker
 
-broker = RabbitBroker()
 app = FastStream(broker=broker)
 
-@broker.subscribe(queue="transactions_queue")
+@broker.subscriber(queue="transactions_queue")
 async def process_transaction(message: dict):
-    async with session_marker() as session:
+    print(f"Received message: {message}")
+    async with session_maker() as session:
         transaction = await session.get(Transaction, message["id"])
         if not transaction:
             print(f"Transaction {message['id']} not found in DB")
